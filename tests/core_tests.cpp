@@ -114,18 +114,67 @@ void test_oracle_picks_a_clearing_piece() {
   }
 }
 
-void test_oracle_fallback_varies() {
+bool is_one_of(PieceType t, const char* names) {
+  const char kNames[] = "IOTSZJL";
+  for (; *names; ++names)
+    if (kNames[static_cast<int>(t)] == *names) return true;
+  return false;
+}
+
+// Play-test board: six pieces clear the bottom row, but only T and S do it without
+// leaving a hole or a tower.
+void test_oracle_prefers_clean_clears() {
+  const char* rows[] = {"#.........", "#........#", "##.#######"};
+  const Board b = board_from(rows, 3);
+  for (uint32_t r = 0; r < 64; ++r) {
+    const OracleChoice c = choose_piece(b, r);
+    CHECK(is_one_of(c.type, "TS"));
+    CHECK(c.target.lines == 1);
+    CHECK(c.target.new_holes == 0);
+  }
+}
+
+// Play-test boards where no piece clears a line: the oracle fills one of the two bottom
+// gaps without creating a hole. With tall walls next to the gaps, J and L can't do that.
+void test_oracle_fills_lowest_gap() {
+  const char* walled[] = {"......##..", "##....##..", "###...###.", "###...###.", "###...###.",
+                          "###...###.", "###...###.", "###...###.", "###.#.####"};
+  const char* open[] = {".......#..", ".......#..", "#.#...####", "###.#.####"};
+  const Board walled_board = board_from(walled, 9);
+  const Board open_board = board_from(open, 4);
+  bool walled_seen[kPieceCount] = {};
+  bool open_seen[kPieceCount] = {};
+  for (uint32_t r = 0; r < 64; ++r) {
+    const OracleChoice w = choose_piece(walled_board, r);
+    CHECK(is_one_of(w.type, "ITSZ"));
+    CHECK(w.target.lines == 0 && w.target.new_holes == 0 && w.target.deepest == kBoardH - 1);
+    walled_seen[static_cast<int>(w.type)] = true;
+
+    const OracleChoice o = choose_piece(open_board, r);
+    CHECK(is_one_of(o.type, "ITSZJL"));
+    CHECK(o.target.lines == 0 && o.target.new_holes == 0 && o.target.deepest == kBoardH - 1);
+    open_seen[static_cast<int>(o.type)] = true;
+  }
+  // Every clean gap-filler gets dealt, not just the flattest one.
+  for (int t = 0; t < kPieceCount; ++t) {
+    CHECK(walled_seen[t] == is_one_of(static_cast<PieceType>(t), "ITSZ"));
+    CHECK(open_seen[t] == is_one_of(static_cast<PieceType>(t), "ITSZJL"));
+  }
+}
+
+// On an empty board, every piece that can lie flat without a hole is fair game; S and Z
+// always leave one.
+void test_oracle_empty_board() {
   const Board empty;
   bool seen[kPieceCount] = {};
-  int distinct = 0;
   for (uint32_t r = 0; r < 64; ++r) {
     const OracleChoice c = choose_piece(empty, r);
     CHECK(c.target.valid());
-    CHECK(c.target.lines == 0);
-    if (!seen[static_cast<int>(c.type)]) ++distinct;
+    CHECK(c.target.lines == 0 && c.target.new_holes == 0);
     seen[static_cast<int>(c.type)] = true;
   }
-  CHECK(distinct >= 2);
+  for (int t = 0; t < kPieceCount; ++t)
+    CHECK(seen[t] == is_one_of(static_cast<PieceType>(t), "IOTJL"));
 }
 
 void test_spawn_and_gravity() {
@@ -224,7 +273,9 @@ int main() {
   test_remove_rows();
   test_oracle_deep_well_gets_i();
   test_oracle_picks_a_clearing_piece();
-  test_oracle_fallback_varies();
+  test_oracle_prefers_clean_clears();
+  test_oracle_fills_lowest_gap();
+  test_oracle_empty_board();
   test_spawn_and_gravity();
   test_hard_drop();
   test_das();

@@ -10,9 +10,11 @@ Status: milestone 2 — the oracle picks every piece; runs in a desktop simulato
 When a piece is about to spawn, the oracle tries every piece in every rotation and column
 (straight drops reachable along the spawn row) on the current board:
 
-1. If any piece can clear lines, you get one of the pieces that clears the most (random among ties).
-2. Otherwise you get one of the pieces that leaves the stack in the best shape (low, flat, no
-   holes), randomly among those close to the best.
+1. If any piece can clear lines, you get one of the pieces that clears the most, preferring
+   clears that leave no new hole. A stack-shape score (low, flat) also rules out clears that
+   leave a tower; the rest are picked at random.
+2. Otherwise you get a random piece among those that fill the lowest gap without creating a
+   hole (if no piece can avoid a hole, among those that create the fewest).
 
 It decides only after the previous piece landed and its lines cleared, so there is no preview.
 Its intended spot is kept secret; press **H** in the simulator to outline it (debug).
