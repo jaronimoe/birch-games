@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "core/board.h"
+#include "core/oracle.h"
 #include "core/pieces.h"
 
 namespace zentris {
@@ -48,6 +49,8 @@ class Game {
   const Board& board() const { return board_; }
   bool has_piece() const { return has_piece_; }
   const ActivePiece& piece() const { return piece_; }
+  // Where the oracle meant the current piece to go. For debugging; the player never sees it.
+  const Placement& oracle_target() const { return oracle_target_; }
   uint32_t frame() const { return frame_; }
 
   uint32_t score() const { return score_; }
@@ -77,18 +80,16 @@ class Game {
   bool try_move(int dx, int dy);
   void try_rotate(int dir);
   void after_move();
-  PieceType next_piece();
   uint32_t random();
 
   Board board_;
   GameState state_ = GameState::Title;
   Phase phase_ = Phase::Entry;
   ActivePiece piece_{PieceType::I, 0, 0, 0};
+  Placement oracle_target_;
   bool has_piece_ = false;
 
   uint32_t rng_;
-  PieceType bag_[kPieceCount];
-  int bag_pos_ = kPieceCount;
 
   uint32_t frame_ = 0;
   uint16_t prev_held_ = 0;

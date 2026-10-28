@@ -20,6 +20,7 @@ struct KeyBinding {
 };
 
 // Stick: arrows / WASD. Stick click: Space. Buttons: Z/J, X/K, Enter, P.
+// Simulator only: H toggles the oracle's target outline, Esc quits.
 constexpr KeyBinding kBindings[] = {
     {SDL_SCANCODE_LEFT, zentris::kLeft},       {SDL_SCANCODE_A, zentris::kLeft},
     {SDL_SCANCODE_RIGHT, zentris::kRight},     {SDL_SCANCODE_D, zentris::kRight},
@@ -77,6 +78,7 @@ int main(int argc, char** argv) {
   zentris::Framebuffer fb{pixels, zentris::kScreenW, zentris::kScreenH};
   zentris::Game game(static_cast<uint32_t>(SDL_GetTicksNS()) ^ 0xA5A5A5A5u);
   zentris::MysteryNextWindow next;
+  zentris::RenderOptions options;
 
   constexpr uint64_t kStepNs = 1000000000ull / zentris::kTicksPerSecond;
   uint64_t last = SDL_GetTicksNS();
@@ -89,6 +91,9 @@ int main(int argc, char** argv) {
       if (event.type == SDL_EVENT_QUIT) running = false;
       if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
         running = false;
+      if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_H &&
+          !event.key.repeat)
+        options.show_oracle_target = !options.show_oracle_target;
     }
 
     const uint64_t now = SDL_GetTicksNS();
@@ -101,7 +106,7 @@ int main(int argc, char** argv) {
       accumulator -= kStepNs;
     }
 
-    zentris::render(game, next, fb);
+    zentris::render(game, next, fb, options);
     SDL_UpdateTexture(texture, nullptr, pixels, zentris::kScreenW * sizeof(uint16_t));
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);

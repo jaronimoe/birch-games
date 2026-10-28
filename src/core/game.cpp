@@ -14,7 +14,6 @@ constexpr int kLineClearFrames = kClearStepFrames * 5;
 constexpr int kCurtainRowFrames = 3;
 constexpr int kCurtainFrames = kCurtainRowFrames * kVisibleRows;
 constexpr int kGameOverInputDelay = kCurtainFrames + 30;
-constexpr int kSpawnX = 3;
 
 constexpr uint32_t kLineScores[kMaxClearRows + 1] = {0, 40, 100, 300, 1200};
 
@@ -87,13 +86,15 @@ void Game::start() {
   clear_count_ = 0;
   das_dir_ = 0;
   das_timer_ = 0;
-  bag_pos_ = kPieceCount;
   state_ = GameState::Playing;
   spawn();
 }
 
+// The next piece is only decided now, after the previous one landed and its lines cleared.
 void Game::spawn() {
-  piece_ = {next_piece(), 0, kSpawnX, kHiddenRows};
+  const OracleChoice choice = choose_piece(board_, random());
+  oracle_target_ = choice.target;
+  piece_ = {choice.type, 0, kSpawnX, kSpawnY};
   phase_ = Phase::Falling;
   phase_timer_ = 0;
   gravity_timer_ = 0;
@@ -254,21 +255,6 @@ void Game::after_move() {
     lock_timer_ = 0;
     ++lock_resets_;
   }
-}
-
-// 7-bag randomizer. Milestone 2 replaces this with the oracle.
-PieceType Game::next_piece() {
-  if (bag_pos_ >= kPieceCount) {
-    for (int i = 0; i < kPieceCount; ++i) bag_[i] = static_cast<PieceType>(i);
-    for (int i = kPieceCount - 1; i > 0; --i) {
-      const int j = static_cast<int>(random() % static_cast<uint32_t>(i + 1));
-      const PieceType t = bag_[i];
-      bag_[i] = bag_[j];
-      bag_[j] = t;
-    }
-    bag_pos_ = 0;
-  }
-  return bag_[bag_pos_++];
 }
 
 uint32_t Game::random() {

@@ -81,8 +81,8 @@ int main(int argc, char** argv) {
     game.tick(input);
     next.tick();
   };
-  auto shoot = [&](const char* name) {
-    render(game, next, fb);
+  auto shoot = [&](const char* name, const RenderOptions& options = {}) {
+    render(game, next, fb, options);
     const std::string path = dir + "/" + name;
     if (write_bmp(path, fb)) std::printf("wrote %s\n", path.c_str());
     else std::printf("could not write %s (does the directory exist?)\n", path.c_str());
@@ -96,6 +96,9 @@ int main(int argc, char** argv) {
          ++guard < 50000)
     step(bot.input(game));
   shoot("play.bmp");
+  RenderOptions debug;
+  debug.show_oracle_target = true;
+  shoot("oracle.bmp", debug);
 
   guard = 0;
   while (!(game.phase() == Phase::LineClear && game.line_clear_step() == 2) && ++guard < 50000)

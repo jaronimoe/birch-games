@@ -5,6 +5,7 @@
 #include "bot.h"
 #include "core/board.h"
 #include "core/game.h"
+#include "core/oracle.h"
 #include "core/pieces.h"
 
 using namespace zentris;
@@ -76,6 +77,55 @@ void test_remove_rows() {
   CHECK(b.at(0, kBoardH - 1) == 3);
   for (int x = 1; x < kBoardW; ++x) CHECK(b.at(x, kBoardH - 1) == 0);
   CHECK(b.at(0, kBoardH - 3) == 0);
+}
+
+// Fills rows from the bottom; each string is one row, '#' = block.
+Board board_from(const char* const* rows, int count) {
+  Board b;
+  for (int i = 0; i < count; ++i) {
+    const int y = kBoardH - count + i;
+    for (int x = 0; x < kBoardW; ++x)
+      if (rows[i][x] == '#') b.set(x, y, 1);
+  }
+  return b;
+}
+
+void test_oracle_deep_well_gets_i() {
+  const char* rows[] = {"######.###", "######.###", "######.###", "######.###"};
+  const Board b = board_from(rows, 4);
+  for (uint32_t r = 0; r < 16; ++r) {
+    const OracleChoice c = choose_piece(b, r);
+    CHECK(c.type == PieceType::I);
+    CHECK(c.target.lines == 4);
+    for (const Cell& cell : piece_cells(c.type, c.target.rot)) CHECK(c.target.x + cell.x == 6);
+  }
+}
+
+void test_oracle_picks_a_clearing_piece() {
+  // The board from the first play test: only the bottom row can be completed.
+  const char* rows[] = {".#..#...##", "##..##.###", "######.###"};
+  const Board b = board_from(rows, 3);
+  CHECK(best_placement(b, PieceType::I).lines == 1);
+  CHECK(best_placement(b, PieceType::O).lines == 0);
+  for (uint32_t r = 0; r < 32; ++r) {
+    const OracleChoice c = choose_piece(b, r);
+    CHECK(c.target.valid());
+    CHECK(c.target.lines == 1);
+  }
+}
+
+void test_oracle_fallback_varies() {
+  const Board empty;
+  bool seen[kPieceCount] = {};
+  int distinct = 0;
+  for (uint32_t r = 0; r < 64; ++r) {
+    const OracleChoice c = choose_piece(empty, r);
+    CHECK(c.target.valid());
+    CHECK(c.target.lines == 0);
+    if (!seen[static_cast<int>(c.type)]) ++distinct;
+    seen[static_cast<int>(c.type)] = true;
+  }
+  CHECK(distinct >= 2);
 }
 
 void test_spawn_and_gravity() {
@@ -172,6 +222,9 @@ int main() {
   test_rotations();
   test_kicks();
   test_remove_rows();
+  test_oracle_deep_well_gets_i();
+  test_oracle_picks_a_clearing_piece();
+  test_oracle_fallback_varies();
   test_spawn_and_gravity();
   test_hard_drop();
   test_das();

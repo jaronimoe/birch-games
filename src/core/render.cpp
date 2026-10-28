@@ -184,7 +184,23 @@ void draw_game_over(Framebuffer& fb, const Game& game) {
   if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 130, "PRESS START", kInk);
 }
 
-void draw_well(Framebuffer& fb, const Game& game) {
+void draw_oracle_target(Framebuffer& fb, const Game& game) {
+  const Placement& t = game.oracle_target();
+  if (!t.valid()) return;
+  const uint16_t c = kBlocks[static_cast<int>(game.piece().type) + 1].light;
+  for (const Cell& cell : piece_cells(game.piece().type, t.rot)) {
+    const int y = t.y + cell.y;
+    if (y < kHiddenRows) continue;
+    const int px = cell_px(t.x + cell.x);
+    const int py = cell_py(y);
+    fb.fill_rect(px, py, 10, 1, c);
+    fb.fill_rect(px, py + 9, 10, 1, c);
+    fb.fill_rect(px, py, 1, 10, c);
+    fb.fill_rect(px + 9, py, 1, 10, c);
+  }
+}
+
+void draw_well(Framebuffer& fb, const Game& game, const RenderOptions& options) {
   const bool flash = game.phase() == Phase::LineClear && game.clear_count() == 4 &&
                      game.state() == GameState::Playing && (game.line_clear_step() & 1);
   draw_well_frame(fb, flash);
@@ -210,6 +226,8 @@ void draw_well(Framebuffer& fb, const Game& game) {
     }
   }
 
+  if (game.has_piece() && options.show_oracle_target) draw_oracle_target(fb, game);
+
   if (game.has_piece()) {
     const ActivePiece& p = game.piece();
     for (const Cell& c : piece_cells(p.type, p.rot)) {
@@ -229,9 +247,9 @@ void draw_well(Framebuffer& fb, const Game& game) {
 
 }  // namespace
 
-void render(const Game& game, NextWindow& next, Framebuffer& fb) {
+void render(const Game& game, NextWindow& next, Framebuffer& fb, const RenderOptions& options) {
   draw_background(fb, game.frame());
-  draw_well(fb, game);
+  draw_well(fb, game, options);
 
   draw_box(fb, kNextBox);
   draw_text_centered(fb, kNextBox.x + kNextBox.w / 2, kNextBox.y + 6, "NEXT", kLabel);

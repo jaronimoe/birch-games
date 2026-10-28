@@ -3,7 +3,19 @@
 A Tetris parody for the Raspberry Pico 2 W (320x240 ST7789, analog stick, 6 buttons, touch).
 The game always hands you the piece you need to clear lines — it just won't tell you where it goes.
 
-Status: milestone 1 — classic Tetris with random pieces (7-bag), running in a desktop simulator.
+Status: milestone 2 — the oracle picks every piece; runs in a desktop simulator.
+
+## The oracle
+
+When a piece is about to spawn, the oracle tries every piece in every rotation and column
+(straight drops reachable along the spawn row) on the current board:
+
+1. If any piece can clear lines, you get one of the pieces that clears the most (random among ties).
+2. Otherwise you get one of the pieces that leaves the stack in the best shape (low, flat, no
+   holes), randomly among those close to the best.
+
+It decides only after the previous piece landed and its lines cleared, so there is no preview.
+Its intended spot is kept secret; press **H** in the simulator to outline it (debug).
 
 ## Layout
 
@@ -14,6 +26,7 @@ src/core/            hardware-independent C++17 game core (shared with the futur
   game.*             states, gravity curve, lock delay, DAS, scoring
   render.*           draws the full 320x240 RGB565 frame
   gfx.*              framebuffer, 5x7 bitmap font
+  oracle.*           picks the next piece and remembers where it meant it to go
   next_window.*      pluggable content for the NEXT box (placeholder: "?")
 src/platform/sdl/    desktop simulator (SDL3)
 tools/               greedy bot + headless screenshot tool
@@ -51,6 +64,7 @@ mkdir -p shots && ./build/zentris_shot shots
 | Button          | Z / J            | rotate counter-clockwise   |
 | Button          | Enter            | start / pause              |
 | Button          | P                | pause                      |
+| —               | H                | toggle oracle target (debug) |
 | —               | Esc              | quit simulator             |
 
 `--scale N` sets the window scale (default 3).

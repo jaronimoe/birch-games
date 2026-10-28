@@ -11,6 +11,8 @@ constexpr int kVisibleRows = 20;
 constexpr int kHiddenRows = 2;  // buffer above the visible well for rotations near the top
 constexpr int kBoardH = kVisibleRows + kHiddenRows;
 constexpr int kMaxClearRows = 4;
+constexpr int kSpawnX = 3;
+constexpr int kSpawnY = kHiddenRows;  // the top of the spawn box sits on the first visible row
 
 // Cell value 0 is empty; otherwise it is the PieceType + 1 that left the block there.
 class Board {

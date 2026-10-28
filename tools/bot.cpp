@@ -1,61 +1,14 @@
 #include "bot.h"
 
-#include <climits>
+#include "core/oracle.h"
 
 namespace zentris::tools {
-namespace {
-
-// Classic weighted heuristic: reward cleared lines, punish height, holes and bumpiness.
-int evaluate(const Board& b, int lines) {
-  int heights[kBoardW] = {};
-  int holes = 0;
-  for (int x = 0; x < kBoardW; ++x) {
-    bool found = false;
-    for (int y = 0; y < kBoardH; ++y) {
-      if (b.at(x, y)) {
-        if (!found) heights[x] = kBoardH - y;
-        found = true;
-      } else if (found) {
-        ++holes;
-      }
-    }
-  }
-  int aggregate = 0;
-  int bumpiness = 0;
-  for (int x = 0; x < kBoardW; ++x) {
-    aggregate += heights[x];
-    if (x + 1 < kBoardW) bumpiness += heights[x] > heights[x + 1] ? heights[x] - heights[x + 1]
-                                                                  : heights[x + 1] - heights[x];
-  }
-  return lines * 760 - aggregate * 51 - holes * 356 - bumpiness * 184;
-}
-
-}  // namespace
 
 void GreedyBot::plan(const Game& game) {
   const ActivePiece& p = game.piece();
-  const Board& board = game.board();
-  int best = INT_MIN;
-  target_rot_ = p.rot;
-  target_x_ = p.x;
-  for (int rot = 0; rot < 4; ++rot) {
-    for (int x = -2; x < kBoardW; ++x) {
-      if (!board.fits(p.type, rot, x, p.y)) continue;
-      int y = p.y;
-      while (board.fits(p.type, rot, x, y + 1)) ++y;
-      Board after = board;
-      after.place(p.type, rot, x, y);
-      int rows[kMaxClearRows];
-      const int lines = after.find_full_rows(rows);
-      after.remove_rows(rows, lines);
-      const int score = evaluate(after, lines);
-      if (score > best) {
-        best = score;
-        target_rot_ = rot;
-        target_x_ = x;
-      }
-    }
-  }
+  const Placement best = best_placement(game.board(), p.type);
+  target_rot_ = best.valid() ? best.rot : p.rot;
+  target_x_ = best.valid() ? best.x : p.x;
   planned_ = true;
   frames_ = 0;
 }

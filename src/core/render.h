@@ -6,7 +6,11 @@
 
 namespace zentris {
 
+struct RenderOptions {
+  bool show_oracle_target = false;  // debug: outline where the oracle meant the piece to go
+};
+
 // Draws the whole 320x240 screen for the current game state.
-void render(const Game& game, NextWindow& next, Framebuffer& fb);
+void render(const Game& game, NextWindow& next, Framebuffer& fb, const RenderOptions& options = {});
 
 }  // namespace zentris
