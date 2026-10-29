@@ -3,8 +3,9 @@
 A Tetris parody for the Raspberry Pico 2 W (320x240 ST7789, analog stick, 6 buttons, touch).
 The game always hands you the piece you need to clear lines — it just won't tell you where it goes.
 
-Status: fully playable in the desktop simulator and the browser; the Pico port is next
-(see [Roadmap](#roadmap)).
+Status: fully playable in the desktop simulator and the browser. The Pico port builds as a
+game on the birch console and waits for its first run on real hardware (see
+[Roadmap](#roadmap)).
 
 ## Roadmap
 
@@ -15,7 +16,7 @@ Status: fully playable in the desktop simulator and the browser; the Pico port i
 | 3 | Clean streak multiplier, the oracle's speech bubble, saved records | done |
 | — | Game modes (MELLOW / RUSH / ZENLESS) with records per mode | done |
 | — | Browser player with on-screen touch controls, published to GitHub Pages | done |
-| 4 | Pico 2 W port: ST7789 driver, stick and buttons, records in flash | next — waits for the hardware repo (wiring, pinout, touch controller) |
+| 4 | Pico 2 W port: a game on the birch console, stick and buttons, records in flash | built — not yet run on hardware |
 | 5 | Touch on the device's menus | planned, part of the Pico port |
 | 6 | Content for the NEXT window (a micro game or animated pixels) | idea pending |
 
@@ -36,7 +37,7 @@ Its intended spot is kept secret; press **H** in the simulator to outline it (de
 ## Layout
 
 ```
-src/core/            hardware-independent C++17 game core (shared with the future Pico build)
+src/core/            hardware-independent C++17 game core (shared by every build)
   pieces.*           tetrominoes, SRS rotations and wall kicks
   board.*            10x20 well (+2 hidden rows), collisions, line clears
   game.*             states, gravity curve, lock delay, DAS, scoring
@@ -49,9 +50,11 @@ src/core/            hardware-independent C++17 game core (shared with the futur
   next_window.*      pluggable content for the NEXT box (placeholder: "?")
 src/platform/sdl/    desktop simulator (SDL3)
 src/platform/web/    browser player: the core as WebAssembly, records in localStorage
+src/platform/common/ hardware-free helpers for the device: controls, dirty-band pushes, records blob
+src/platform/birch/  the game on the birch console (built inside birch's firmware)
 web/                 browser player page: canvas, on-screen buttons, game loop
 tools/               greedy bot + headless screenshot tool
-tests/               core tests
+tests/               core tests, tests of the device helpers
 ```
 
 ## Build and run
@@ -123,5 +126,29 @@ python3 -m http.server 8123 --directory build-web/web
 ```
 
 Then open http://localhost:8123 (to try it on a phone, use this Mac's address on the same
-network). Pushes to `main` publish it to GitHub Pages via `.github/workflows/pages.yml`;
+network).
+
+## On the handheld (birch)
+
+On the Pico 2 W, Zentris is one of the games on the [birch](https://github.com/jaronimoe/birch-zentris)
+console: birch owns the hardware (display, buttons, stick, flash, battery) and pulls this
+repo in as the submodule `lib/zentris`. Its CMakeLists.txt builds `zentris_core`,
+`zentris_platform_common` and `src/platform/birch/zentris_game.cpp`, and ZENTRIS appears in
+the console's menu. birch's `ZENTRIS.md` has the build steps and a checklist for the first
+run on hardware.
+
+| Button              | Action                                                   |
+|---------------------|----------------------------------------------------------|
+| Stick left/right    | move (hold to auto-repeat)                               |
+| Stick down          | soft drop (only when pushed mostly down)                 |
+| Stick up/down       | pick the mode on the title                               |
+| Red (right)         | rotate clockwise                                         |
+| Yellow, green       | rotate counter-clockwise                                 |
+| Blue (top), stick click | hard drop; blue/yellow also pick the mode on the title |
+| White               | start / pause                                            |
+| Black               | pause while playing, back to the console otherwise       |
+
+Each frame only the 8-row bands that changed go to the panel (a full frame takes ~33 ms over
+SPI). Records are kept in birch's flash storage; the console's FACTORY RESET clears them.
+Touch isn't used yet (roadmap item 5). Pushes to `main` publish it to GitHub Pages via `.github/workflows/pages.yml`;
 the repo's Pages source must be set to "GitHub Actions".

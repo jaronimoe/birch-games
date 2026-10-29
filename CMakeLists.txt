@@ -6,7 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Under emcmake only the browser player is built; natively everything but the player.
-if(EMSCRIPTEN)
+# Pulled into another build (birch's firmware, add_subdirectory) or cross-compiled, only the
+# libraries are.
+if(EMSCRIPTEN OR CMAKE_CROSSCOMPILING OR NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   set(zentris_native OFF)
 else()
   set(zentris_native ON)
@@ -14,7 +16,7 @@ endif()
 option(ZENTRIS_BUILD_SIM "Build the SDL3 desktop simulator" ${zentris_native})
 option(ZENTRIS_BUILD_TOOLS "Build tests and the screenshot tool" ${zentris_native})
 
-# Hardware-independent game core, shared by the simulator and (later) the Pico build.
+# Hardware-independent game core, shared by the simulator, the browser and the device.
 add_library(zentris_core STATIC
   src/core/board.cpp
   src/core/game.cpp
@@ -28,6 +30,15 @@ add_library(zentris_core STATIC
 )
 target_include_directories(zentris_core PUBLIC src)
 target_compile_options(zentris_core PRIVATE -Wall -Wextra -Wpedantic)
+
+# Hardware-free helpers for the device port (input mapping, dirty-band pushes, records blob),
+# tested on the host.
+add_library(zentris_platform_common STATIC
+  src/platform/common/dirty_bands.cpp
+  src/platform/common/pad_input.cpp
+)
+target_link_libraries(zentris_platform_common PUBLIC zentris_core)
+target_compile_options(zentris_platform_common PRIVATE -Wall -Wextra -Wpedantic)
 
 if(ZENTRIS_BUILD_SIM)
   find_package(SDL3 REQUIRED CONFIG)
@@ -66,6 +77,11 @@ if(ZENTRIS_BUILD_TOOLS)
   add_executable(zentris_shot tools/screenshot.cpp)
   target_link_libraries(zentris_shot PRIVATE zentris_bot)
 
+  add_executable(zentris_platform_tests tests/platform_tests.cpp)
+  target_link_libraries(zentris_platform_tests PRIVATE zentris_bot zentris_platform_common)
+  target_compile_options(zentris_platform_tests PRIVATE -Wall -Wextra)
+
   enable_testing()
   add_test(NAME core_tests COMMAND zentris_tests)
+  add_test(NAME platform_tests COMMAND zentris_platform_tests)
 endif()
