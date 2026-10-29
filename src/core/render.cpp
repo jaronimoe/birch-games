@@ -19,6 +19,8 @@ constexpr Rect kStatBoxes[4] = {
 constexpr uint16_t kWellBg = rgb(13, 11, 26);
 constexpr uint16_t kWellFlash = rgb(70, 60, 110);
 constexpr uint16_t kGridDot = rgb(34, 31, 58);
+constexpr uint16_t kTextDim = rgb(120, 112, 150);
+constexpr uint16_t kRecordColor = kBlocks[7].dark;
 constexpr uint16_t kWellFrame[4] = {rgb(60, 58, 80), rgb(150, 148, 170), rgb(205, 203, 220),
                                     rgb(90, 88, 110)};
 
@@ -206,27 +208,57 @@ void draw_title(Framebuffer& fb, const Game& game) {
   int x = kWell.x + kWell.w / 2 - text_width(kName, scale) / 2;
   for (int i = 0; kName[i]; ++i, x += 6 * scale) {
     const char letter[2] = {kName[i], '\0'};
-    draw_text(fb, x + 1, 61, letter, kBlocks[i + 1].dark, scale);
-    draw_text(fb, x, 60, letter, kBlocks[i + 1].base, scale);
+    draw_text(fb, x + 1, 51, letter, kBlocks[i + 1].dark, scale);
+    draw_text(fb, x, 50, letter, kBlocks[i + 1].base, scale);
   }
   const int cx = kWell.x + kWell.w / 2;
-  draw_text_centered(fb, cx, 96, "THE UNIVERSE", kPaper);
-  draw_text_centered(fb, cx, 106, "PROVIDES", kPaper);
-  if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 170, "PRESS START", kBlocks[2].base);
+  draw_text_centered(fb, cx, 80, "THE UNIVERSE", kPaper);
+  draw_text_centered(fb, cx, 90, "PROVIDES", kPaper);
+
+  // Mode picker: stick up/down. The TOP box shows the selected mode's best score.
+  for (int m = 0; m < kModeCount; ++m) {
+    const GameMode mode = static_cast<GameMode>(m);
+    const int y = 124 + m * 14;
+    if (mode == game.mode()) {
+      char label[16] = "> ";
+      std::strcat(label, mode_name(mode));
+      std::strcat(label, " <");
+      draw_text_centered(fb, cx, y, label, kBlocks[2].base);
+    } else {
+      draw_text_centered(fb, cx, y, mode_name(mode), kTextDim);
+    }
+  }
+
+  if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 186, "PRESS START", kPaper);
 }
 
+void draw_labeled_number(Framebuffer& fb, int cx, int y, const char* label, uint32_t value,
+                         uint16_t c) {
+  char buf[24];
+  std::strcpy(buf, label);
+  format_number(buf + std::strlen(label), value, 1);
+  draw_text_centered(fb, cx, y, buf, c);
+}
+
+// Numbers that beat this mode's record are drawn in kRecordColor.
 void draw_game_over(Framebuffer& fb, const Game& game) {
   const int cx = kWell.x + kWell.w / 2;
-  draw_panel(fb, 66, 98);
-  draw_text_centered(fb, cx, 76, "GAME OVER", kLabel);
-  char buf[24];
+  const uint8_t broken = game.new_records();
+  const auto color = [broken](uint8_t flag) { return (broken & flag) ? kRecordColor : kInk; };
+
+  draw_panel(fb, 58, 112);
+  draw_text_centered(fb, cx, 68, "GAME OVER", kLabel);
+  char buf[12];
   format_number(buf, game.score(), 6);
-  draw_text_centered(fb, cx, 92, buf, kInk);
-  std::strcpy(buf, "STREAK ");
-  format_number(buf + 7, static_cast<uint32_t>(game.best_streak()), 1);
-  draw_text_centered(fb, cx, 106, buf, kInk);
-  if (game.new_hi_score()) draw_text_centered(fb, cx, 120, "NEW BEST!", kBlocks[7].dark);
-  if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 144, "PRESS START", kInk);
+  draw_text_centered(fb, cx, 84, buf, color(kRecordScore));
+  draw_labeled_number(fb, cx, 98, "LINES ", static_cast<uint32_t>(game.lines()),
+                      color(kRecordLines));
+  draw_labeled_number(fb, cx, 110, "LEVEL ", static_cast<uint32_t>(game.level()),
+                      color(kRecordLevel));
+  draw_labeled_number(fb, cx, 122, "STREAK ", static_cast<uint32_t>(game.best_streak()),
+                      color(kRecordStreak));
+  if (broken) draw_text_centered(fb, cx, 138, "NEW BEST!", kRecordColor);
+  if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 154, "PRESS START", kInk);
 }
 
 void draw_oracle_target(Framebuffer& fb, const Game& game) {
@@ -301,6 +333,16 @@ void render(const Game& game, NextWindow& next, const OracleSpeech& speech, Fram
   draw_box(fb, kNextBox);
   draw_text_centered(fb, kNextBox.x + kNextBox.w / 2, kNextBox.y + 6, "NEXT", kLabel);
   next.draw(fb, {kNextBox.x + 6, kNextBox.y + 16, kNextBox.w - 12, kNextBox.h - 20});
+
+  if (game.state() == GameState::Title) {
+    // The selected mode's records, updated as the player switches modes.
+    const Records& best = game.records();
+    draw_stat(fb, kStatBoxes[0], "BEST SCORE", best.score, 6);
+    draw_stat(fb, kStatBoxes[1], "BEST STREAK", best.streak, 1);
+    draw_stat(fb, kStatBoxes[2], "BEST LEVEL", best.level, 2);
+    draw_stat(fb, kStatBoxes[3], "BEST LINES", best.lines, 3);
+    return;
+  }
 
   draw_stat(fb, kStatBoxes[0], "SCORE", game.score(), 6);
   if (game.multiplier() > 1) {

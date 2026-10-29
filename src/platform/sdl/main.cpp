@@ -17,32 +17,39 @@
 
 namespace {
 
-// Keeps the high score in ~/.zentris_hiscore.
+// Keeps the records in ~/.zentris_hiscore, one line per game mode: score lines level streak.
+// Older files with just a score per line still load; the other records start at 0.
 class FileStorage : public zentris::Storage {
  public:
   FileStorage() {
     const char* home = std::getenv("HOME");
     path_ = std::string(home ? home : ".") + "/.zentris_hiscore";
-  }
-
-  uint32_t load_hi_score() override {
-    unsigned long score = 0;
-    if (std::FILE* f = std::fopen(path_.c_str(), "r")) {
-      if (std::fscanf(f, "%lu", &score) != 1) score = 0;
-      std::fclose(f);
+    std::FILE* f = std::fopen(path_.c_str(), "r");
+    if (!f) return;
+    char line[128];
+    for (int m = 0; m < zentris::kModeCount && std::fgets(line, sizeof(line), f); ++m) {
+      unsigned long v[4] = {};
+      std::sscanf(line, "%lu %lu %lu %lu", &v[0], &v[1], &v[2], &v[3]);
+      records_[m] = {static_cast<uint32_t>(v[0]), static_cast<uint32_t>(v[1]),
+                     static_cast<uint32_t>(v[2]), static_cast<uint32_t>(v[3])};
     }
-    return static_cast<uint32_t>(score);
+    std::fclose(f);
   }
 
-  void save_hi_score(uint32_t score) override {
+  zentris::Records load_records(int mode) override { return records_[mode]; }
+
+  void save_records(int mode, const zentris::Records& records) override {
+    records_[mode] = records;
     if (std::FILE* f = std::fopen(path_.c_str(), "w")) {
-      std::fprintf(f, "%u\n", score);
+      for (const zentris::Records& r : records_)
+        std::fprintf(f, "%u %u %u %u\n", r.score, r.lines, r.level, r.streak);
       std::fclose(f);
     }
   }
 
  private:
   std::string path_;
+  zentris::Records records_[zentris::kModeCount];
 };
 
 struct KeyBinding {

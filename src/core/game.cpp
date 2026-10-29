@@ -37,6 +37,24 @@ bool same_cells(const ActivePiece& piece, const Placement& target) {
 
 }  // namespace
 
+int lines_per_level(GameMode mode) {
+  switch (mode) {
+    case GameMode::Mellow: return 10;  // classic NES pace
+    case GameMode::Rush: return 4;
+    case GameMode::Zenless: return 1;
+  }
+  return 10;
+}
+
+const char* mode_name(GameMode mode) {
+  switch (mode) {
+    case GameMode::Mellow: return "MELLOW";
+    case GameMode::Rush: return "RUSH";
+    case GameMode::Zenless: return "ZENLESS";
+  }
+  return "";
+}
+
 int streak_multiplier(int streak) {
   if (streak >= 50) return 4;
   if (streak >= 25) return 3;
@@ -46,7 +64,15 @@ int streak_multiplier(int streak) {
 
 Game::Game(uint32_t seed, Storage* storage)
     : storage_(storage), rng_(seed ? seed : 0x9E3779B9u) {
-  if (storage_) hi_score_ = storage_->load_hi_score();
+  if (storage_)
+    for (int m = 0; m < kModeCount; ++m) records_[m] = storage_->load_records(m);
+}
+
+uint32_t Game::hi_score() const {
+  const uint32_t stored = records().score;
+  // On the title screen score_ may belong to a game in another mode.
+  if (state_ == GameState::Title) return stored;
+  return stored > score_ ? stored : score_;
 }
 
 void Game::tick(uint16_t held) {
@@ -57,6 +83,10 @@ void Game::tick(uint16_t held) {
   switch (state_) {
     case GameState::Title:
       random();  // the moment Start is pressed seeds the run
+      if (pressed & (kUp | kDown)) {
+        const int step = (pressed & kUp) ? kModeCount - 1 : 1;  // wraps around
+        mode_ = static_cast<GameMode>((static_cast<int>(mode_) + step) % kModeCount);
+      }
       if (pressed & kStart) start();
       break;
     case GameState::Paused:
@@ -104,7 +134,7 @@ void Game::start() {
   level_ = 0;
   streak_ = 0;
   best_streak_ = 0;
-  new_hi_ = false;
+  new_records_ = 0;
   clear_count_ = 0;
   das_dir_ = 0;
   das_timer_ = 0;
@@ -160,7 +190,7 @@ void Game::lock_piece() {
     score_ += kLineScores[clear_count_] * static_cast<uint32_t>(level_ + 1) *
               static_cast<uint32_t>(streak_multiplier(streak_));
     lines_ += clear_count_;
-    level_ = lines_ / 10;
+    level_ = lines_ / lines_per_level(mode_);
     phase_ = Phase::LineClear;
   } else {
     phase_ = Phase::Entry;
@@ -177,11 +207,17 @@ void Game::game_over() {
   has_piece_ = false;
   state_ = GameState::GameOver;
   phase_timer_ = 0;
-  if (score_ > hi_score_) {
-    hi_score_ = score_;
-    new_hi_ = true;
-    if (storage_) storage_->save_hi_score(hi_score_);
-  }
+  Records& best = records_[static_cast<int>(mode_)];
+  const auto beat = [this](uint32_t& record, uint32_t value, RecordFlag flag) {
+    if (value <= record) return;
+    record = value;
+    new_records_ |= flag;
+  };
+  beat(best.score, score_, kRecordScore);
+  beat(best.lines, static_cast<uint32_t>(lines_), kRecordLines);
+  beat(best.level, static_cast<uint32_t>(level_), kRecordLevel);
+  beat(best.streak, static_cast<uint32_t>(best_streak_), kRecordStreak);
+  if (new_records_ && storage_) storage_->save_records(static_cast<int>(mode_), best);
   emit(GameEvent::GameOver);
 }
 

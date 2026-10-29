@@ -122,5 +122,8 @@ int main(int argc, char** argv) {
   while (!game.game_over_ready()) step(0);
   for (int i = 0; i < 5; ++i) step(0);
   shoot("gameover.bmp");
+  step(kStart);
+  step(0);
+  shoot("records.bmp");
   return 0;
 }

@@ -50,6 +50,20 @@ struct ActivePiece {
 
 constexpr int kTicksPerSecond = 60;
 
+// Chosen on the title screen. Modes differ in how fast the levels (and so the speed) go up.
+enum class GameMode : uint8_t { Mellow, Rush, Zenless };
+constexpr int kModeCount = 3;
+
+int lines_per_level(GameMode mode);
+const char* mode_name(GameMode mode);
+
+enum RecordFlag : uint8_t {
+  kRecordScore = 1 << 0,
+  kRecordLines = 1 << 1,
+  kRecordLevel = 1 << 2,
+  kRecordStreak = 1 << 3,
+};
+
 // Line-clear multiplier for a clean streak (pieces placed in a row without a new hole).
 int streak_multiplier(int streak);
 
@@ -70,9 +84,14 @@ class Game {
   const Placement& oracle_target() const { return oracle_target_; }
   uint32_t frame() const { return frame_; }
 
+  GameMode mode() const { return mode_; }
   uint32_t score() const { return score_; }
-  uint32_t hi_score() const { return hi_score_ > score_ ? hi_score_ : score_; }
-  bool new_hi_score() const { return new_hi_; }
+  // Best score for the current mode, including the game in progress.
+  uint32_t hi_score() const;
+  // Saved records for the current mode (not counting the game in progress).
+  const Records& records() const { return records_[static_cast<int>(mode_)]; }
+  // Which records the last finished game broke, as RecordFlag bits.
+  uint8_t new_records() const { return new_records_; }
   int level() const { return level_; }
   int lines() const { return lines_; }
   int streak() const { return streak_; }
@@ -133,9 +152,10 @@ class Game {
   int clear_rows_[kMaxClearRows] = {};
   int clear_count_ = 0;
 
+  GameMode mode_ = GameMode::Mellow;
   uint32_t score_ = 0;
-  uint32_t hi_score_ = 0;
-  bool new_hi_ = false;
+  Records records_[kModeCount];
+  uint8_t new_records_ = 0;
   int level_ = 0;
   int lines_ = 0;
   int streak_ = 0;

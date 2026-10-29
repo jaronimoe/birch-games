@@ -76,13 +76,18 @@ mkdir -p shots && ./build/zentris_shot shots
 
 ## Rules (current)
 
-- NES-style gravity curve: 48 frames per row at level 0 down to 1 at level 29; level up every 10 lines.
+- Three modes, picked on the title screen with the stick (up/down): MELLOW (a level every 10
+  lines, classic NES pace), RUSH (every 4 lines) and ZENLESS (every line).
+- NES-style gravity curve: 48 frames per row at level 0 down to 1 at level 29.
 - Scoring: 40 / 100 / 300 / 1200 × (level + 1) × streak multiplier, +1 per soft-dropped row,
   +2 per hard-dropped row.
 - Clean streak: every piece placed without creating a hole extends it, a hole resets it.
   Multiplier ×2 from 10, ×3 from 25, ×4 from 50 (shown next to the score).
 - The oracle lives in the pagoda and comments on the game in a speech bubble (start, clears
   where it planned, clears it didn't plan, broken streaks, level ups, 4-line clears, game over).
-- The high score is saved to `~/.zentris_hiscore` in the simulator.
+- Each mode keeps its own records for score, lines, level and clean streak, each beaten on its
+  own. The title screen shows the selected mode's records; at game over, numbers that beat a
+  record turn orange. The simulator saves them to `~/.zentris_hiscore` (one line per mode:
+  score lines level streak).
 - 0.5 s lock delay, resets on move/rotate (max 15 per new lowest row).
 - No next-piece preview: in Zentris the next piece depends on where you put this one.

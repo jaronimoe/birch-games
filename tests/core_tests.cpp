@@ -248,7 +248,7 @@ void test_reckless_top_out() {
   CHECK(g.state() == GameState::GameOver);
   CHECK(g.score() > 0);
   CHECK(g.hi_score() == g.score());
-  CHECK(g.new_hi_score());
+  CHECK(g.new_records() & kRecordScore);
 }
 
 void test_bot_clears_lines() {
@@ -260,7 +260,7 @@ void test_bot_clears_lines() {
     g.tick(bot.input(g));
     if (g.lines() > prev_lines) {
       CHECK(g.score() > prev_score);
-      CHECK(g.level() == g.lines() / 10);
+      CHECK(g.level() == g.lines() / lines_per_level(g.mode()));
     }
     prev_lines = g.lines();
     prev_score = g.score();
@@ -270,13 +270,15 @@ void test_bot_clears_lines() {
 
 class MemoryStorage : public Storage {
  public:
-  explicit MemoryStorage(uint32_t hi) : hi_(hi) {}
-  uint32_t load_hi_score() override { return hi_; }
-  void save_hi_score(uint32_t score) override {
-    hi_ = score;
+  explicit MemoryStorage(uint32_t score) {
+    for (Records& r : records_) r.score = score;
+  }
+  Records load_records(int mode) override { return records_[mode]; }
+  void save_records(int mode, const Records& records) override {
+    records_[mode] = records;
     ++saves_;
   }
-  uint32_t hi_ = 0;
+  Records records_[kModeCount];
   int saves_ = 0;
 };
 
@@ -329,14 +331,81 @@ void test_hi_score_storage() {
   tools::GreedyBot reckless;
   reckless.set_reckless(true);
   while (a.state() != GameState::GameOver) a.tick(reckless.input(a));
-  CHECK(high.saves_ == 0);
-  CHECK(!a.new_hi_score());
+  CHECK(!(a.new_records() & kRecordScore));
+  CHECK(high.records_[0].score == 1000000);
 
   MemoryStorage empty(0);
   Game b(7, &empty);
   while (b.state() != GameState::GameOver) b.tick(reckless.input(b));
   CHECK(empty.saves_ == 1);
-  CHECK(empty.hi_ == b.score());
+  CHECK(empty.records_[0].score == b.score());
+}
+
+// Each record is beaten on its own: a new best score doesn't touch a better lines record.
+void test_records_are_independent() {
+  MemoryStorage storage(0);
+  storage.records_[0].lines = 50;
+  storage.records_[0].streak = 1000;
+  Game g(7, &storage);
+  CHECK(g.records().lines == 50);
+  tools::GreedyBot reckless;
+  reckless.set_reckless(true);
+  while (g.state() != GameState::GameOver) g.tick(reckless.input(g));
+  CHECK(g.new_records() & kRecordScore);
+  CHECK(!(g.new_records() & kRecordLines));
+  CHECK(!(g.new_records() & kRecordStreak));
+  CHECK(storage.records_[0].score == g.score());
+  CHECK(storage.records_[0].lines == 50);
+  CHECK(storage.records_[0].streak == 1000);
+}
+
+void test_modes() {
+  CHECK(lines_per_level(GameMode::Mellow) == 10);
+  CHECK(lines_per_level(GameMode::Rush) == 4);
+  CHECK(lines_per_level(GameMode::Zenless) == 1);
+
+  Game g(3);
+  CHECK(g.mode() == GameMode::Mellow);
+  g.tick(kUp);  // wraps around
+  g.tick(0);
+  CHECK(g.mode() == GameMode::Zenless);
+  g.tick(kDown);
+  g.tick(0);
+  CHECK(g.mode() == GameMode::Mellow);
+  g.tick(kDown);
+  g.tick(0);
+  CHECK(g.mode() == GameMode::Rush);
+}
+
+// High scores are kept per mode, and the title shows the selected mode's.
+void test_hi_score_per_mode() {
+  MemoryStorage storage(0);
+  storage.records_[2].score = 777;
+  Game g(9, &storage);
+  CHECK(g.hi_score() == 0);
+  g.tick(kDown);  // Rush
+  g.tick(0);
+  tools::GreedyBot reckless;
+  reckless.set_reckless(true);
+  while (g.state() != GameState::GameOver) g.tick(reckless.input(g));
+  CHECK(g.mode() == GameMode::Rush);
+  CHECK(storage.records_[0].score == 0);
+  CHECK(storage.records_[1].score == g.score());
+  CHECK(storage.records_[2].score == 777);
+
+  while (g.state() != GameState::Title) g.tick(reckless.input(g));
+  g.tick(0);
+  g.tick(kDown);  // Zenless
+  CHECK(g.hi_score() == 777);
+}
+
+void test_zenless_levels_per_line() {
+  Game g(42);
+  g.tick(kUp);  // Zenless
+  g.tick(0);
+  tools::GreedyBot bot;
+  while (g.lines() < 12 && g.state() != GameState::GameOver) g.tick(bot.input(g));
+  CHECK(g.level() == g.lines());
 }
 
 void test_events() {
@@ -426,6 +495,10 @@ int main() {
   test_streak_multiplier();
   test_streak_counts_and_breaks();
   test_hi_score_storage();
+  test_records_are_independent();
+  test_modes();
+  test_hi_score_per_mode();
+  test_zenless_levels_per_line();
   test_events();
   test_speech();
   test_wrap_text();
