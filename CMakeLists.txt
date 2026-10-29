@@ -5,8 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(ZENTRIS_BUILD_SIM "Build the SDL3 desktop simulator" ON)
-option(ZENTRIS_BUILD_TOOLS "Build tests and the screenshot tool" ON)
+# Under emcmake only the browser player is built; natively everything but the player.
+if(EMSCRIPTEN)
+  set(zentris_native OFF)
+else()
+  set(zentris_native ON)
+endif()
+option(ZENTRIS_BUILD_SIM "Build the SDL3 desktop simulator" ${zentris_native})
+option(ZENTRIS_BUILD_TOOLS "Build tests and the screenshot tool" ${zentris_native})
 
 # Hardware-independent game core, shared by the simulator and (later) the Pico build.
 add_library(zentris_core STATIC
@@ -28,6 +34,24 @@ if(ZENTRIS_BUILD_SIM)
   add_executable(zentris_sim src/platform/sdl/main.cpp)
   target_link_libraries(zentris_sim PRIVATE zentris_core SDL3::SDL3)
   target_compile_options(zentris_sim PRIVATE -Wall -Wextra)
+endif()
+
+if(EMSCRIPTEN)
+  # Static site in <build>/web: zentris.js + zentris.wasm next to the page files.
+  set(web_out ${CMAKE_BINARY_DIR}/web)
+  add_executable(zentris_web src/platform/web/main.cpp)
+  target_link_libraries(zentris_web PRIVATE zentris_core)
+  target_compile_options(zentris_web PRIVATE -Wall -Wextra)
+  set_target_properties(zentris_web PROPERTIES OUTPUT_NAME zentris RUNTIME_OUTPUT_DIRECTORY ${web_out})
+  target_link_options(zentris_web PRIVATE
+    -sENVIRONMENT=web
+    -sMODULARIZE=1
+    -sEXPORT_NAME=createZentris
+    -sEXPORTED_RUNTIME_METHODS=HEAPU8
+  )
+  foreach(page_file index.html player.css player.js)
+    configure_file(web/${page_file} ${web_out}/${page_file} COPYONLY)
+  endforeach()
 endif()
 
 if(ZENTRIS_BUILD_TOOLS)

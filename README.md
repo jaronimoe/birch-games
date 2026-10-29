@@ -34,6 +34,8 @@ src/core/            hardware-independent C++17 game core (shared with the futur
   storage.h          high-score persistence interface (file in the simulator)
   next_window.*      pluggable content for the NEXT box (placeholder: "?")
 src/platform/sdl/    desktop simulator (SDL3)
+src/platform/web/    browser player: the core as WebAssembly, records in localStorage
+web/                 browser player page: canvas, on-screen buttons, game loop
 tools/               greedy bot + headless screenshot tool
 tests/               core tests
 ```
@@ -91,3 +93,21 @@ mkdir -p shots && ./build/zentris_shot shots
   score lines level streak).
 - 0.5 s lock delay, resets on move/rotate (max 15 per new lowest row).
 - No next-piece preview: in Zentris the next piece depends on where you put this one.
+
+## Web player
+
+A static page that runs the game in the browser, with on-screen buttons for phones
+(D-pad, rotate, drop, start, pause) and the simulator's keys on a keyboard. The oracle's
+target outline is not available there. Needs Emscripten (`brew install emscripten`).
+
+```bash
+emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release && cmake --build build-web -j
+```
+
+```bash
+python3 -m http.server 8123 --directory build-web/web
+```
+
+Then open http://localhost:8123 (to try it on a phone, use this Mac's address on the same
+network). Pushes to `main` publish it to GitHub Pages via `.github/workflows/pages.yml`;
+the repo's Pages source must be set to "GitHub Actions".

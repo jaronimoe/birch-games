@@ -1,0 +1,283 @@
+/* Colors follow src/core/palette.h. */
+:root {
+  --ink: #1a1c2c;
+  --night: #2a2140;
+  --paper: #f4f0e6;
+  --paper-pressed: #d9d3c4;
+  --label: #b13e53;
+  --label-pressed: #8e2f42;
+  --shadow: #140a20;
+  --gap: 12px;
+  --pad: min(42vw, 30dvh, 200px);
+  --round: calc(var(--pad) * 0.42);
+  --sys-h: 36px;
+  --side-l: max(16px, env(safe-area-inset-left));
+  --side-r: max(16px, env(safe-area-inset-right));
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0%, var(--night), var(--ink) 70%) fixed var(--ink);
+  color: var(--paper);
+  font: 700 14px/1 ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  /* No scrolling, zooming, text selection or callouts while thumbs mash the buttons. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#player {
+  height: 100%;
+  display: grid;
+  gap: var(--gap);
+  padding: max(var(--gap), env(safe-area-inset-top)) var(--side-r)
+    max(var(--gap), env(safe-area-inset-bottom)) var(--side-l);
+  /* Portrait: screen on top, controls below. */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas:
+    "screen screen"
+    "system system"
+    "pad buttons";
+}
+
+/* In portrait the screen runs edge to edge; only the controls keep the side gutters. */
+#screen-box {
+  grid-area: screen;
+  position: relative;
+  width: calc(100% + var(--side-l) + var(--side-r));
+  margin-left: calc(-1 * var(--side-l));
+  aspect-ratio: 4 / 3;
+  max-height: 56dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+#screen {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  box-shadow: 0 0 0 2px var(--shadow), 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+#status {
+  position: absolute;
+  margin: 0;
+  color: var(--paper);
+}
+
+#status:empty {
+  display: none;
+}
+
+.cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+#pad {
+  grid-area: pad;
+}
+
+#buttons {
+  grid-area: buttons;
+}
+
+#system {
+  grid-area: system;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* Buttons: paper cards with the game's hard drop shadow; pressing sinks them. */
+button,
+.arm,
+.hub {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: 0 4px 0 var(--shadow);
+  transition: transform 40ms, box-shadow 40ms, background-color 40ms;
+}
+
+button.pressed,
+.arm.pressed {
+  background: var(--paper-pressed);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--shadow);
+}
+
+svg {
+  display: block;
+  fill: currentColor;
+}
+
+.pill {
+  height: var(--sys-h);
+  padding: 0 18px;
+  border-radius: calc(var(--sys-h) / 2);
+  font-size: 12px;
+}
+
+#dpad {
+  width: var(--pad);
+  height: var(--pad);
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  grid-template-areas:
+    ". up ."
+    "left hub right"
+    ". down .";
+}
+
+.arm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arm svg {
+  width: 55%;
+  color: var(--ink);
+}
+
+.arm[data-dir="up"] {
+  grid-area: up;
+  border-radius: 8px 8px 0 0;
+}
+
+.arm[data-dir="down"] {
+  grid-area: down;
+  border-radius: 0 0 8px 8px;
+}
+
+.arm[data-dir="down"] svg {
+  transform: rotate(180deg);
+}
+
+.arm[data-dir="left"] {
+  grid-area: left;
+  border-radius: 8px 0 0 8px;
+}
+
+.arm[data-dir="left"] svg {
+  transform: rotate(-90deg);
+}
+
+.arm[data-dir="right"] {
+  grid-area: right;
+  border-radius: 0 8px 8px 0;
+}
+
+.arm[data-dir="right"] svg {
+  transform: rotate(90deg);
+}
+
+.hub {
+  grid-area: hub;
+}
+
+/* Rotate buttons sit on a diagonal like A/B on a handheld; Drop sits apart below them. */
+#buttons {
+  display: grid;
+  grid-template-columns: var(--round) var(--round);
+  grid-template-rows: var(--round) auto;
+  column-gap: calc(var(--round) * 0.3);
+  row-gap: calc(var(--round) * 0.55);
+  align-content: center;
+  justify-content: center;
+}
+
+.round {
+  width: var(--round);
+  height: var(--round);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.round[data-action="RotateCCW"] {
+  transform: translateY(30%);
+}
+
+.round[data-action="RotateCCW"].pressed {
+  transform: translateY(calc(30% + 3px));
+}
+
+.round svg {
+  width: 62%;
+}
+
+.round .arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.round svg.ccw {
+  transform: scaleX(-1);
+}
+
+.drop {
+  grid-column: 1 / 3;
+  height: calc(var(--round) * 0.7);
+  border-radius: calc(var(--round) * 0.35);
+  background: var(--label);
+  color: var(--paper);
+  font-size: 15px;
+}
+
+.drop.pressed {
+  background: var(--label-pressed);
+}
+
+/* Landscape: screen in the middle, controls on either side. */
+@media (orientation: landscape) {
+  :root {
+    --pad: min(22vw, 48dvh, 220px);
+  }
+
+  #player {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "pad screen buttons"
+      "pad system buttons";
+  }
+
+  #screen-box {
+    width: min(
+      calc((100dvh - var(--sys-h) - 3 * var(--gap) - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 4 / 3),
+      calc(100vw - 2 * var(--pad) - 6 * var(--gap) - env(safe-area-inset-left) - env(safe-area-inset-right))
+    );
+    max-height: none;
+    margin-left: 0;
+    align-self: center;
+  }
+}

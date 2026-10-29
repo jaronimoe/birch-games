@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1c2c">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Zentris">
+  <title>Zentris</title>
+  <link rel="stylesheet" href="player.css">
+</head>
+<body>
+  <main id="player">
+    <div id="screen-box">
+      <canvas id="screen" width="320" height="240" aria-label="Zentris"></canvas>
+      <p id="status">Loading…</p>
+    </div>
+
+    <div id="pad" class="cluster">
+      <div id="dpad" aria-label="Direction pad">
+        <div class="arm" data-dir="up"><svg viewBox="0 0 10 10"><path d="M5 2.5 8 7H2z"/></svg></div>
+        <div class="arm" data-dir="left"><svg viewBox="0 0 10 10"><path d="M5 2.5 8 7H2z"/></svg></div>
+        <div class="hub"></div>
+        <div class="arm" data-dir="right"><svg viewBox="0 0 10 10"><path d="M5 2.5 8 7H2z"/></svg></div>
+        <div class="arm" data-dir="down"><svg viewBox="0 0 10 10"><path d="M5 2.5 8 7H2z"/></svg></div>
+      </div>
+    </div>
+
+    <div id="system">
+      <button class="pill" data-action="Start">Start</button>
+      <button class="pill" data-action="Pause">Pause</button>
+    </div>
+
+    <div id="buttons" class="cluster">
+      <button class="round" data-action="RotateCCW" aria-label="Rotate counterclockwise">
+        <svg viewBox="0 0 24 24" class="ccw"><path class="arc" d="M12 5a7 7 0 1 1-7 7"/><path d="M5 7.5 8.5 13h-7z"/></svg>
+      </button>
+      <button class="round" data-action="RotateCW" aria-label="Rotate clockwise">
+        <svg viewBox="0 0 24 24"><path class="arc" d="M12 5a7 7 0 1 1-7 7"/><path d="M5 7.5 8.5 13h-7z"/></svg>
+      </button>
+      <button class="drop" data-action="HardDrop">Drop</button>
+    </div>
+  </main>
+
+  <script src="zentris.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>
