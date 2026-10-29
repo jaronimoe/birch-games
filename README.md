@@ -3,7 +3,21 @@
 A Tetris parody for the Raspberry Pico 2 W (320x240 ST7789, analog stick, 6 buttons, touch).
 The game always hands you the piece you need to clear lines — it just won't tell you where it goes.
 
-Status: milestone 3 — oracle, clean streak, oracle speech and saved high score; runs in a desktop simulator.
+Status: fully playable in the desktop simulator and the browser; the Pico port is next
+(see [Roadmap](#roadmap)).
+
+## Roadmap
+
+| # | Milestone | Status |
+|---|-----------|--------|
+| 1 | C++ game core + SDL desktop simulator, classic layout | done |
+| 2 | Oracle picks every piece (clean clears first, otherwise fill the lowest gap without a hole) | done |
+| 3 | Clean streak multiplier, the oracle's speech bubble, saved records | done |
+| — | Game modes (MELLOW / RUSH / ZENLESS) with records per mode | done |
+| — | Browser player with on-screen touch controls, published to GitHub Pages | done |
+| 4 | Pico 2 W port: ST7789 driver, stick and buttons, records in flash | next — waits for the hardware repo (wiring, pinout, touch controller) |
+| 5 | Touch on the device's menus | planned, part of the Pico port |
+| 6 | Content for the NEXT window (a micro game or animated pixels) | idea pending |
 
 ## The oracle
 
