@@ -1,5 +1,7 @@
 #include "core/render.h"
 
+#include <cstring>
+
 #include "core/palette.h"
 
 namespace zentris {
@@ -30,6 +32,11 @@ constexpr uint16_t kFarHills = rgb(90, 45, 106);
 constexpr uint16_t kNearHills = rgb(43, 22, 64);
 constexpr uint16_t kPagoda = rgb(20, 10, 32);
 constexpr uint16_t kLantern = rgb(255, 211, 107);
+constexpr uint16_t kLanternLit = rgb(255, 250, 225);
+constexpr uint16_t kLanternOff = rgb(70, 45, 70);
+
+constexpr int kPagodaX = 284;
+constexpr int kBubbleBottom = 146;  // the bubble's tail points down at the pagoda's spire
 
 constexpr uint8_t kBayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
@@ -40,7 +47,8 @@ int tri(int x, int period, int amp) {
   return amp * (d < 0 ? -d : d) / period;
 }
 
-void draw_pagoda(Framebuffer& fb, int cx, int ground) {
+// The oracle lives in the top tier; its window lights up while it speaks.
+void draw_pagoda(Framebuffer& fb, int cx, int ground, bool oracle_speaking) {
   int y = ground - 4;
   fb.fill_rect(cx - 20, y, 40, 4, kPagoda);
   for (int tier = 0; tier < 4; ++tier) {
@@ -48,7 +56,12 @@ void draw_pagoda(Framebuffer& fb, int cx, int ground) {
     const int bh = 13 - tier;
     y -= bh;
     fb.fill_rect(cx - bw / 2, y, bw, bh, kPagoda);
-    fb.fill_rect(cx - 1, y + 4, 2, 4, kLantern);
+    if (tier == 3) {
+      if (oracle_speaking) fb.fill_rect(cx - 2, y + 3, 4, 6, kLantern);
+      fb.fill_rect(cx - 1, y + 4, 2, 4, oracle_speaking ? kLanternLit : kLanternOff);
+    } else {
+      fb.fill_rect(cx - 1, y + 4, 2, 4, kLantern);
+    }
     if (tier < 2) {
       fb.fill_rect(cx - bw / 2 + 3, y + 4, 2, 4, kLantern);
       fb.fill_rect(cx + bw / 2 - 5, y + 4, 2, 4, kLantern);
@@ -65,7 +78,7 @@ void draw_pagoda(Framebuffer& fb, int cx, int ground) {
   fb.fill_rect(cx - 2, y - 9, 4, 1, kPagoda);
 }
 
-void draw_background(Framebuffer& fb, uint32_t frame) {
+void draw_background(Framebuffer& fb, uint32_t frame, bool oracle_speaking) {
   for (int y = 0; y < fb.h; ++y) {
     const int v = y >= 170 ? 80 : y * 80 / 170;  // dithered dusk gradient, done by the horizon
     uint16_t* row = fb.px + y * fb.w;
@@ -94,7 +107,36 @@ void draw_background(Framebuffer& fb, uint32_t frame) {
     fb.fill_rect(x, near_top, 1, fb.h - near_top, kNearHills);
   }
 
-  draw_pagoda(fb, 284, 236);
+  draw_pagoda(fb, kPagodaX, 236, oracle_speaking);
+}
+
+void draw_speech(Framebuffer& fb, const OracleSpeech& speech) {
+  char lines[kSpeechLines][kSpeechChars + 1];
+  const int n = speech.speaking() ? wrap_text(speech.line(), lines, kSpeechLines) : 0;
+  if (n == 0) return;
+
+  int text_w = 0;
+  for (int i = 0; i < n; ++i)
+    if (text_width(lines[i]) > text_w) text_w = text_width(lines[i]);
+  const int w = text_w + 8;  // 67 at most, so it fits between the stat boxes and the edge
+  const int h = n * 9 + 5;
+  const Rect r{kPagodaX - w / 2, kBubbleBottom - h, w, h};
+  fb.fill_rect(r.x + 1, r.y, r.w - 2, r.h, kInk);  // rounded corners: leave them out
+  fb.fill_rect(r.x, r.y + 1, r.w, r.h - 2, kInk);
+  fb.fill_rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, kPaper);
+
+  // Tail pointing down at the oracle's window.
+  for (int i = 0; i < 5; ++i) {
+    const int x0 = kPagodaX - 4 + i;
+    const int w = 9 - 2 * i;
+    const int y = kBubbleBottom - 1 + i;
+    fb.fill_rect(x0, y, w, 1, kPaper);
+    fb.set(x0 - 1, y, kInk);
+    fb.set(x0 + w, y, kInk);
+  }
+  fb.set(kPagodaX, kBubbleBottom + 4, kInk);
+
+  for (int i = 0; i < n; ++i) draw_text_centered(fb, r.x + r.w / 2, r.y + 3 + i * 9, lines[i], kInk);
 }
 
 void draw_box(Framebuffer& fb, const Rect& r) {
@@ -175,13 +217,16 @@ void draw_title(Framebuffer& fb, const Game& game) {
 
 void draw_game_over(Framebuffer& fb, const Game& game) {
   const int cx = kWell.x + kWell.w / 2;
-  draw_panel(fb, 76, 70);
-  draw_text_centered(fb, cx, 86, "GAME OVER", kLabel);
-  char buf[12];
+  draw_panel(fb, 66, 98);
+  draw_text_centered(fb, cx, 76, "GAME OVER", kLabel);
+  char buf[24];
   format_number(buf, game.score(), 6);
-  draw_text_centered(fb, cx, 102, buf, kInk);
-  if (game.new_hi_score()) draw_text_centered(fb, cx, 114, "NEW BEST!", kBlocks[7].dark);
-  if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 130, "PRESS START", kInk);
+  draw_text_centered(fb, cx, 92, buf, kInk);
+  std::strcpy(buf, "STREAK ");
+  format_number(buf + 7, static_cast<uint32_t>(game.best_streak()), 1);
+  draw_text_centered(fb, cx, 106, buf, kInk);
+  if (game.new_hi_score()) draw_text_centered(fb, cx, 120, "NEW BEST!", kBlocks[7].dark);
+  if ((game.frame() / 30) % 2 == 0) draw_text_centered(fb, cx, 144, "PRESS START", kInk);
 }
 
 void draw_oracle_target(Framebuffer& fb, const Game& game) {
@@ -247,8 +292,10 @@ void draw_well(Framebuffer& fb, const Game& game, const RenderOptions& options) 
 
 }  // namespace
 
-void render(const Game& game, NextWindow& next, Framebuffer& fb, const RenderOptions& options) {
-  draw_background(fb, game.frame());
+void render(const Game& game, NextWindow& next, const OracleSpeech& speech, Framebuffer& fb,
+            const RenderOptions& options) {
+  draw_background(fb, game.frame(), speech.speaking());
+  draw_speech(fb, speech);
   draw_well(fb, game, options);
 
   draw_box(fb, kNextBox);
@@ -256,6 +303,11 @@ void render(const Game& game, NextWindow& next, Framebuffer& fb, const RenderOpt
   next.draw(fb, {kNextBox.x + 6, kNextBox.y + 16, kNextBox.w - 12, kNextBox.h - 20});
 
   draw_stat(fb, kStatBoxes[0], "SCORE", game.score(), 6);
+  if (game.multiplier() > 1) {
+    const char mult[3] = {'X', static_cast<char>('0' + game.multiplier()), '\0'};
+    const Rect& r = kStatBoxes[0];
+    draw_text(fb, r.x + r.w - 6 - text_width(mult), r.y + 18, mult, kLabel);
+  }
   draw_stat(fb, kStatBoxes[1], "TOP", game.hi_score(), 6);
   draw_stat(fb, kStatBoxes[2], "LEVEL", static_cast<uint32_t>(game.level()), 2);
   draw_stat(fb, kStatBoxes[3], "LINES", static_cast<uint32_t>(game.lines()), 3);

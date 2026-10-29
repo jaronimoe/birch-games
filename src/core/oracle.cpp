@@ -63,6 +63,23 @@ int evaluate_board(const Board& board, int lines) {
   return lines * 760 - aggregate * 51 - count_holes(board) * 356 - bumpiness * 184;
 }
 
+Placement evaluate_placement(const Board& board, PieceType type, int rot, int x, int y,
+                             int holes_before) {
+  Placement p{rot, x, y};
+  for (const Cell& c : piece_cells(type, rot))
+    if (y + c.y > p.deepest) p.deepest = y + c.y;
+
+  Board after = board;
+  after.place(type, rot, x, y);
+  int rows[kMaxClearRows];
+  p.lines = after.find_full_rows(rows);
+  after.remove_rows(rows, p.lines);
+  const int holes = count_holes(after) - holes_before;
+  p.new_holes = holes > 0 ? holes : 0;
+  p.score = evaluate_board(after, p.lines);
+  return p;
+}
+
 Placement best_placement(const Board& board, PieceType type) {
   const int holes_before = count_holes(board);
   Placement best;
@@ -72,20 +89,7 @@ Placement best_placement(const Board& board, PieceType type) {
       if (!reachable(board, type, rot, x)) continue;
       int y = kSpawnY;
       while (board.fits(type, rot, x, y + 1)) ++y;
-
-      Placement p{rot, x, y};
-      for (const Cell& c : piece_cells(type, rot))
-        if (y + c.y > p.deepest) p.deepest = y + c.y;
-
-      Board after = board;
-      after.place(type, rot, x, y);
-      int rows[kMaxClearRows];
-      p.lines = after.find_full_rows(rows);
-      after.remove_rows(rows, p.lines);
-      const int holes = count_holes(after) - holes_before;
-      p.new_holes = holes > 0 ? holes : 0;
-      p.score = evaluate_board(after, p.lines);
-
+      const Placement p = evaluate_placement(board, type, rot, x, y, holes_before);
       if (!best.valid() || better(p, best)) best = p;
     }
   }

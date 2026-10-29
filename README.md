@@ -3,7 +3,7 @@
 A Tetris parody for the Raspberry Pico 2 W (320x240 ST7789, analog stick, 6 buttons, touch).
 The game always hands you the piece you need to clear lines — it just won't tell you where it goes.
 
-Status: milestone 2 — the oracle picks every piece; runs in a desktop simulator.
+Status: milestone 3 — oracle, clean streak, oracle speech and saved high score; runs in a desktop simulator.
 
 ## The oracle
 
@@ -29,6 +29,9 @@ src/core/            hardware-independent C++17 game core (shared with the futur
   render.*           draws the full 320x240 RGB565 frame
   gfx.*              framebuffer, 5x7 bitmap font
   oracle.*           picks the next piece and remembers where it meant it to go
+  oracle_speech.*    what the oracle in the pagoda says, and when
+  oracle_lines.cpp   the oracle's lines (edit freely; tests check they fit the bubble)
+  storage.h          high-score persistence interface (file in the simulator)
   next_window.*      pluggable content for the NEXT box (placeholder: "?")
 src/platform/sdl/    desktop simulator (SDL3)
 tools/               greedy bot + headless screenshot tool
@@ -74,6 +77,12 @@ mkdir -p shots && ./build/zentris_shot shots
 ## Rules (current)
 
 - NES-style gravity curve: 48 frames per row at level 0 down to 1 at level 29; level up every 10 lines.
-- Scoring: 40 / 100 / 300 / 1200 × (level + 1), +1 per soft-dropped row, +2 per hard-dropped row.
+- Scoring: 40 / 100 / 300 / 1200 × (level + 1) × streak multiplier, +1 per soft-dropped row,
+  +2 per hard-dropped row.
+- Clean streak: every piece placed without creating a hole extends it, a hole resets it.
+  Multiplier ×2 from 10, ×3 from 25, ×4 from 50 (shown next to the score).
+- The oracle lives in the pagoda and comments on the game in a speech bubble (start, clears
+  where it planned, clears it didn't plan, broken streaks, level ups, 4-line clears, game over).
+- The high score is saved to `~/.zentris_hiscore` in the simulator.
 - 0.5 s lock delay, resets on move/rotate (max 15 per new lowest row).
 - No next-piece preview: in Zentris the next piece depends on where you put this one.

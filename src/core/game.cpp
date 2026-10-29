@@ -25,9 +25,29 @@ int gravity_frames(int level) {
   return level < 29 ? 2 : 1;
 }
 
+bool same_cells(const ActivePiece& piece, const Placement& target) {
+  for (const Cell& a : piece_cells(piece.type, piece.rot)) {
+    bool found = false;
+    for (const Cell& b : piece_cells(piece.type, target.rot))
+      if (piece.x + a.x == target.x + b.x && piece.y + a.y == target.y + b.y) found = true;
+    if (!found) return false;
+  }
+  return true;
+}
+
 }  // namespace
 
-Game::Game(uint32_t seed) : rng_(seed ? seed : 0x9E3779B9u) {}
+int streak_multiplier(int streak) {
+  if (streak >= 50) return 4;
+  if (streak >= 25) return 3;
+  if (streak >= 10) return 2;
+  return 1;
+}
+
+Game::Game(uint32_t seed, Storage* storage)
+    : storage_(storage), rng_(seed ? seed : 0x9E3779B9u) {
+  if (storage_) hi_score_ = storage_->load_hi_score();
+}
 
 void Game::tick(uint16_t held) {
   const uint16_t pressed = held & ~prev_held_;
@@ -82,11 +102,14 @@ void Game::start() {
   score_ = 0;
   lines_ = 0;
   level_ = 0;
+  streak_ = 0;
+  best_streak_ = 0;
   new_hi_ = false;
   clear_count_ = 0;
   das_dir_ = 0;
   das_timer_ = 0;
   state_ = GameState::Playing;
+  emit(GameEvent::Start);
   spawn();
 }
 
@@ -109,6 +132,9 @@ void Game::spawn() {
 }
 
 void Game::lock_piece() {
+  const Placement landed = evaluate_placement(board_, piece_.type, piece_.rot, piece_.x,
+                                              piece_.y, count_holes(board_));
+  const bool as_planned = oracle_target_.valid() && same_cells(piece_, oracle_target_);
   board_.place(piece_.type, piece_.rot, piece_.x, piece_.y);
   has_piece_ = false;
 
@@ -120,16 +146,31 @@ void Game::lock_piece() {
     return;
   }
 
+  const int prev_streak = streak_;
+  if (landed.new_holes > 0) {
+    streak_ = 0;
+  } else if (++streak_ > best_streak_) {
+    best_streak_ = streak_;
+  }
+
+  const int prev_level = level_;
   phase_timer_ = 0;
   clear_count_ = board_.find_full_rows(clear_rows_);
-  if (clear_count_ == 0) {
+  if (clear_count_ > 0) {
+    score_ += kLineScores[clear_count_] * static_cast<uint32_t>(level_ + 1) *
+              static_cast<uint32_t>(streak_multiplier(streak_));
+    lines_ += clear_count_;
+    level_ = lines_ / 10;
+    phase_ = Phase::LineClear;
+  } else {
     phase_ = Phase::Entry;
-    return;
   }
-  score_ += kLineScores[clear_count_] * static_cast<uint32_t>(level_ + 1);
-  lines_ += clear_count_;
-  level_ = lines_ / 10;
-  phase_ = Phase::LineClear;
+
+  if (clear_count_ == 4) emit(GameEvent::FourLines);
+  else if (level_ > prev_level) emit(GameEvent::LevelUp);
+  else if (streak_ == 0 && streak_multiplier(prev_streak) > 1) emit(GameEvent::StreakBroken);
+  else if (oracle_target_.valid() && clear_count_ > oracle_target_.lines) emit(GameEvent::Bold);
+  else if (clear_count_ > 0 && as_planned) emit(GameEvent::AsForeseen);
 }
 
 void Game::game_over() {
@@ -139,7 +180,14 @@ void Game::game_over() {
   if (score_ > hi_score_) {
     hi_score_ = score_;
     new_hi_ = true;
+    if (storage_) storage_->save_hi_score(hi_score_);
   }
+  emit(GameEvent::GameOver);
+}
+
+void Game::emit(GameEvent event) {
+  last_event_ = event;
+  ++event_count_;
 }
 
 void Game::tick_playing(uint16_t held, uint16_t pressed) {

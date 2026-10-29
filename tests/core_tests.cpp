@@ -1,12 +1,15 @@
 // Minimal self-contained tests for the game core. Run via `ctest` or directly.
 
 #include <cstdio>
+#include <string>
 
 #include "bot.h"
 #include "core/board.h"
 #include "core/game.h"
 #include "core/oracle.h"
+#include "core/oracle_speech.h"
 #include "core/pieces.h"
+#include "core/storage.h"
 
 using namespace zentris;
 
@@ -265,6 +268,144 @@ void test_bot_clears_lines() {
   CHECK(g.lines() >= 20);
 }
 
+class MemoryStorage : public Storage {
+ public:
+  explicit MemoryStorage(uint32_t hi) : hi_(hi) {}
+  uint32_t load_hi_score() override { return hi_; }
+  void save_hi_score(uint32_t score) override {
+    hi_ = score;
+    ++saves_;
+  }
+  uint32_t hi_ = 0;
+  int saves_ = 0;
+};
+
+// Hard-drops the first piece, then swaps in `board` before the next piece is chosen.
+void start_with_board(Game& g, const Board& board) {
+  g.tick(kStart);
+  g.tick(0);
+  g.tick(kHardDrop);
+  g.load_board(board);
+  g.tick(0);
+}
+
+// Lets the bot play until the game reports a new event; returns it.
+GameEvent next_event(Game& g, tools::GreedyBot& bot) {
+  const uint32_t count = g.event_count();
+  for (int i = 0; i < 2000 && g.event_count() == count; ++i) g.tick(bot.input(g));
+  return g.event_count() == count ? GameEvent::None : g.last_event();
+}
+
+void test_streak_multiplier() {
+  CHECK(streak_multiplier(0) == 1);
+  CHECK(streak_multiplier(9) == 1);
+  CHECK(streak_multiplier(10) == 2);
+  CHECK(streak_multiplier(25) == 3);
+  CHECK(streak_multiplier(49) == 3);
+  CHECK(streak_multiplier(50) == 4);
+  CHECK(streak_multiplier(500) == 4);
+}
+
+void test_streak_counts_and_breaks() {
+  Game g(5);
+  g.tick(kStart);
+  g.tick(0);
+  g.tick(kHardDrop);  // the oracle only deals flat, hole-free pieces on an empty board
+  CHECK(g.streak() == 1);
+
+  // A lone block under the spawn column: any piece dropped straight down bridges it.
+  const char* bump[] = {"....#....."};
+  g.load_board(board_from(bump, 1));
+  while (!g.has_piece()) g.tick(0);
+  g.tick(kHardDrop);
+  CHECK(g.streak() == 0);
+  CHECK(g.best_streak() == 1);
+}
+
+void test_hi_score_storage() {
+  MemoryStorage high(1000000);
+  Game a(7, &high);
+  CHECK(a.hi_score() == 1000000);
+  tools::GreedyBot reckless;
+  reckless.set_reckless(true);
+  while (a.state() != GameState::GameOver) a.tick(reckless.input(a));
+  CHECK(high.saves_ == 0);
+  CHECK(!a.new_hi_score());
+
+  MemoryStorage empty(0);
+  Game b(7, &empty);
+  while (b.state() != GameState::GameOver) b.tick(reckless.input(b));
+  CHECK(empty.saves_ == 1);
+  CHECK(empty.hi_ == b.score());
+}
+
+void test_events() {
+  tools::GreedyBot bot;
+
+  Game foreseen(11);
+  const char* playtest[] = {"#.........", "#........#", "##.#######"};
+  start_with_board(foreseen, board_from(playtest, 3));
+  CHECK(foreseen.last_event() == GameEvent::Start);
+  CHECK(next_event(foreseen, bot) == GameEvent::AsForeseen);
+
+  Game four(11);
+  const char* well[] = {"######.###", "######.###", "######.###", "######.###"};
+  start_with_board(four, board_from(well, 4));
+  CHECK(next_event(four, bot) == GameEvent::FourLines);
+
+  Game over(11);
+  tools::GreedyBot reckless;
+  reckless.set_reckless(true);
+  while (over.state() != GameState::GameOver) over.tick(reckless.input(over));
+  CHECK(over.last_event() == GameEvent::GameOver);
+}
+
+void test_speech() {
+  Game g(11);
+  OracleSpeech speech;
+  tools::GreedyBot reckless;
+  reckless.set_reckless(true);
+  while (g.state() != GameState::GameOver) {
+    g.tick(reckless.input(g));
+    speech.tick(g);
+  }
+  CHECK(speech.speaking());
+  const LineSet game_over = oracle_lines(GameEvent::GameOver);
+  bool from_set = false;
+  for (int i = 0; i < game_over.count; ++i) from_set |= speech.line() == game_over.lines[i];
+  CHECK(from_set);
+  for (int i = 0; i < 400; ++i) speech.tick(g);
+  CHECK(!speech.speaking());
+}
+
+void test_wrap_text() {
+  char lines[kSpeechLines][kSpeechChars + 1];
+  CHECK(wrap_text("THAT HOLE WAS NOT IN THE PLAN.", lines, kSpeechLines) == 3);
+  CHECK(std::string(lines[0]) == "THAT HOLE");
+  CHECK(std::string(lines[1]) == "WAS NOT IN");
+  CHECK(std::string(lines[2]) == "THE PLAN.");
+  CHECK(wrap_text("INTERESTING...", lines, kSpeechLines) == 0);
+  CHECK(wrap_text("ONE TWO THREE FOUR FIVE SIX SEVEN", lines, kSpeechLines) == 0);
+}
+
+// Every line in oracle_lines.cpp has to fit the bubble.
+void test_oracle_lines_fit() {
+  const GameEvent events[] = {GameEvent::Start,        GameEvent::AsForeseen, GameEvent::Bold,
+                              GameEvent::StreakBroken, GameEvent::LevelUp,    GameEvent::FourLines,
+                              GameEvent::GameOver};
+  char lines[kSpeechLines][kSpeechChars + 1];
+  for (GameEvent e : events) {
+    const LineSet set = oracle_lines(e);
+    CHECK(set.count > 0);
+    for (int i = 0; i < set.count; ++i) {
+      if (wrap_text(set.lines[i], lines, kSpeechLines) == 0) {
+        std::printf("does not fit the bubble: \"%s\"\n", set.lines[i]);
+        ++g_failures;
+      }
+    }
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -282,6 +423,13 @@ int main() {
   test_pause();
   test_reckless_top_out();
   test_bot_clears_lines();
+  test_streak_multiplier();
+  test_streak_counts_and_breaks();
+  test_hi_score_storage();
+  test_events();
+  test_speech();
+  test_wrap_text();
+  test_oracle_lines_fit();
   if (g_failures == 0) std::printf("all tests passed\n");
   return g_failures == 0 ? 0 : 1;
 }

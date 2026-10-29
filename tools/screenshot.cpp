@@ -75,14 +75,16 @@ int main(int argc, char** argv) {
   Framebuffer fb{pixels, kScreenW, kScreenH};
   Game game(3);
   MysteryNextWindow next;
+  OracleSpeech speech;
   tools::GreedyBot bot;
 
   auto step = [&](uint16_t input) {
     game.tick(input);
     next.tick();
+    speech.tick(game);
   };
   auto shoot = [&](const char* name, const RenderOptions& options = {}) {
-    render(game, next, fb, options);
+    render(game, next, speech, fb, options);
     const std::string path = dir + "/" + name;
     if (write_bmp(path, fb)) std::printf("wrote %s\n", path.c_str());
     else std::printf("could not write %s (does the directory exist?)\n", path.c_str());
@@ -104,6 +106,13 @@ int main(int argc, char** argv) {
   while (!(game.phase() == Phase::LineClear && game.line_clear_step() == 2) && ++guard < 50000)
     step(bot.input(game));
   shoot("clear.bmp");
+
+  guard = 0;
+  const uint32_t events = game.event_count();
+  while (!(game.event_count() != events && speech.speaking() && game.has_piece()) &&
+         ++guard < 50000)
+    step(bot.input(game));
+  shoot("speech.bmp");
 
   bot.set_reckless(true);
   guard = 0;

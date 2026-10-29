@@ -15,6 +15,8 @@ add_library(zentris_core STATIC
   src/core/gfx.cpp
   src/core/next_window.cpp
   src/core/oracle.cpp
+  src/core/oracle_lines.cpp
+  src/core/oracle_speech.cpp
   src/core/pieces.cpp
   src/core/render.cpp
 )

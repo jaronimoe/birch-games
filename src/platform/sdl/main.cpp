@@ -6,13 +6,44 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "core/game.h"
 #include "core/gfx.h"
 #include "core/next_window.h"
+#include "core/oracle_speech.h"
 #include "core/render.h"
+#include "core/storage.h"
 
 namespace {
+
+// Keeps the high score in ~/.zentris_hiscore.
+class FileStorage : public zentris::Storage {
+ public:
+  FileStorage() {
+    const char* home = std::getenv("HOME");
+    path_ = std::string(home ? home : ".") + "/.zentris_hiscore";
+  }
+
+  uint32_t load_hi_score() override {
+    unsigned long score = 0;
+    if (std::FILE* f = std::fopen(path_.c_str(), "r")) {
+      if (std::fscanf(f, "%lu", &score) != 1) score = 0;
+      std::fclose(f);
+    }
+    return static_cast<uint32_t>(score);
+  }
+
+  void save_hi_score(uint32_t score) override {
+    if (std::FILE* f = std::fopen(path_.c_str(), "w")) {
+      std::fprintf(f, "%u\n", score);
+      std::fclose(f);
+    }
+  }
+
+ private:
+  std::string path_;
+};
 
 struct KeyBinding {
   SDL_Scancode key;
@@ -76,8 +107,10 @@ int main(int argc, char** argv) {
 
   static uint16_t pixels[zentris::kScreenW * zentris::kScreenH];
   zentris::Framebuffer fb{pixels, zentris::kScreenW, zentris::kScreenH};
-  zentris::Game game(static_cast<uint32_t>(SDL_GetTicksNS()) ^ 0xA5A5A5A5u);
+  FileStorage storage;
+  zentris::Game game(static_cast<uint32_t>(SDL_GetTicksNS()) ^ 0xA5A5A5A5u, &storage);
   zentris::MysteryNextWindow next;
+  zentris::OracleSpeech speech;
   zentris::RenderOptions options;
 
   constexpr uint64_t kStepNs = 1000000000ull / zentris::kTicksPerSecond;
@@ -103,10 +136,11 @@ int main(int argc, char** argv) {
     while (accumulator >= kStepNs) {
       game.tick(read_input());
       next.tick();
+      speech.tick(game);
       accumulator -= kStepNs;
     }
 
-    zentris::render(game, next, fb, options);
+    zentris::render(game, next, speech, fb, options);
     SDL_UpdateTexture(texture, nullptr, pixels, zentris::kScreenW * sizeof(uint16_t));
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);

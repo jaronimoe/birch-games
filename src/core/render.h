@@ -3,6 +3,7 @@
 #include "core/game.h"
 #include "core/gfx.h"
 #include "core/next_window.h"
+#include "core/oracle_speech.h"
 
 namespace zentris {
 
@@ -11,6 +12,7 @@ struct RenderOptions {
 };
 
 // Draws the whole 320x240 screen for the current game state.
-void render(const Game& game, NextWindow& next, Framebuffer& fb, const RenderOptions& options = {});
+void render(const Game& game, NextWindow& next, const OracleSpeech& speech, Framebuffer& fb,
+            const RenderOptions& options = {});
 
 }  // namespace zentris

@@ -29,6 +29,10 @@ int count_holes(const Board& board);
 // Board heuristic: rewards cleared lines, punishes stack height, holes and bumpiness.
 int evaluate_board(const Board& board, int lines);
 
+// Scores `type` resting at (rot, x, y). `holes_before` is count_holes(board).
+Placement evaluate_placement(const Board& board, PieceType type, int rot, int x, int y,
+                             int holes_before);
+
 // Best straight-drop placement for `type`, reached from the spawn position by rotating and
 // then sliding along the spawn row. Ranked by: most lines cleared, fewest new holes,
 // deepest reach (fills the lowest gap), then the heuristic.

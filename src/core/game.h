@@ -5,6 +5,7 @@
 #include "core/board.h"
 #include "core/oracle.h"
 #include "core/pieces.h"
+#include "core/storage.h"
 
 namespace zentris {
 
@@ -30,6 +31,18 @@ enum class Phase : uint8_t {
   LineClear,  // full rows are being wiped
 };
 
+// Things the oracle may comment on. At most one per locked piece.
+enum class GameEvent : uint8_t {
+  None,
+  Start,
+  AsForeseen,    // cleared lines exactly where the oracle meant the piece to go
+  Bold,          // cleared more lines than the oracle planned (tucks, spins)
+  StreakBroken,  // created a hole while the streak had a multiplier
+  LevelUp,
+  FourLines,
+  GameOver,
+};
+
 struct ActivePiece {
   PieceType type;
   int rot, x, y;
@@ -37,9 +50,13 @@ struct ActivePiece {
 
 constexpr int kTicksPerSecond = 60;
 
+// Line-clear multiplier for a clean streak (pieces placed in a row without a new hole).
+int streak_multiplier(int streak);
+
 class Game {
  public:
-  explicit Game(uint32_t seed);
+  // `storage` (optional) keeps the high score between sessions.
+  explicit Game(uint32_t seed, Storage* storage = nullptr);
 
   // Advances one fixed 1/60 s step. `held` is the bitmask of Actions held this step.
   void tick(uint16_t held);
@@ -58,6 +75,16 @@ class Game {
   bool new_hi_score() const { return new_hi_; }
   int level() const { return level_; }
   int lines() const { return lines_; }
+  int streak() const { return streak_; }
+  int best_streak() const { return best_streak_; }
+  int multiplier() const { return streak_multiplier(streak_); }
+
+  // The most recent event; event_count() goes up by one per event so observers can spot new ones.
+  GameEvent last_event() const { return last_event_; }
+  uint32_t event_count() const { return event_count_; }
+
+  // Replaces the board contents. For tests and debug tools.
+  void load_board(const Board& board) { board_ = board; }
 
   // Line clear animation: rows being wiped and how far the wipe has spread (0..4).
   bool is_clearing_row(int y) const;
@@ -80,8 +107,10 @@ class Game {
   bool try_move(int dx, int dy);
   void try_rotate(int dir);
   void after_move();
+  void emit(GameEvent event);
   uint32_t random();
 
+  Storage* storage_;
   Board board_;
   GameState state_ = GameState::Title;
   Phase phase_ = Phase::Entry;
@@ -109,6 +138,11 @@ class Game {
   bool new_hi_ = false;
   int level_ = 0;
   int lines_ = 0;
+  int streak_ = 0;
+  int best_streak_ = 0;
+
+  GameEvent last_event_ = GameEvent::None;
+  uint32_t event_count_ = 0;
 };
 
 }  // namespace zentris
